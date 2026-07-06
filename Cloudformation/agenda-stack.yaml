@@ -1,0 +1,533 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Description: >
+  Infraestrutura da aplicação Agenda de Contatos
+
+Parameters:
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: Nome da Key Pair existente
+
+  DBUsername:
+    Type: String
+    Default: admin
+
+  DBPassword:
+    Type: String
+    NoEcho: true
+    MinLength: 8
+
+
+Resources:
+
+  #########################################
+  # VPC
+  #########################################
+
+  AgendaVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+
+      Tags:
+        - Key: Name
+          Value: agenda-vpc
+
+  #########################################
+  # Internet Gateway
+  #########################################
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: agenda-igw
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref AgendaVPC
+
+  #########################################
+  # Public Subnet A
+  #########################################
+
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+
+      VpcId: !Ref AgendaVPC
+
+      AvailabilityZone: us-east-1a
+
+      CidrBlock: 10.0.1.0/24
+
+      MapPublicIpOnLaunch: true
+
+      Tags:
+        - Key: Name
+          Value: public-a
+
+  #########################################
+  # Public Subnet B
+  #########################################
+
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+
+      VpcId: !Ref AgendaVPC
+
+      AvailabilityZone: us-east-1b
+
+      CidrBlock: 10.0.2.0/24
+
+      MapPublicIpOnLaunch: true
+
+      Tags:
+        - Key: Name
+          Value: public-b
+
+  #########################################
+  # Private Subnet A
+  #########################################
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+
+      VpcId: !Ref AgendaVPC
+
+      AvailabilityZone: us-east-1a
+
+      CidrBlock: 10.0.11.0/24
+
+      Tags:
+        - Key: Name
+          Value: private-a
+
+  #########################################
+  # Private Subnet B
+  #########################################
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+
+      VpcId: !Ref AgendaVPC
+
+      AvailabilityZone: us-east-1b
+
+      CidrBlock: 10.0.12.0/24
+
+      Tags:
+        - Key: Name
+          Value: private-b
+
+  #########################################
+  # Public Route Table
+  #########################################
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+
+      VpcId: !Ref AgendaVPC
+
+      Tags:
+        - Key: Name
+          Value: public-rt
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+
+    DependsOn: AttachGateway
+
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+
+      DestinationCidrBlock: 0.0.0.0/0
+
+      GatewayId: !Ref InternetGateway
+
+  #########################################
+  # Associações
+  #########################################
+
+  PublicSubnetAAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+
+    Properties:
+
+      RouteTableId: !Ref PublicRouteTable
+
+      SubnetId: !Ref PublicSubnetA
+
+  PublicSubnetBAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+
+    Properties:
+
+      RouteTableId: !Ref PublicRouteTable
+
+      SubnetId: !Ref PublicSubnetB
+
+#########################################
+# Security Group ALB
+#########################################
+
+  ALBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group do ALB
+      VpcId: !Ref AgendaVPC
+
+      SecurityGroupIngress:
+
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+      SecurityGroupEgress:
+
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+      Tags:
+        - Key: Name
+          Value: alb-sg
+
+#########################################
+# Security Group WEB
+#########################################
+
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+
+    Properties:
+
+      GroupDescription: Security Group EC2
+
+      VpcId: !Ref AgendaVPC
+
+      SecurityGroupIngress:
+
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref ALBSecurityGroup
+
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+
+      SecurityGroupEgress:
+
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+      Tags:
+        - Key: Name
+          Value: web-sg
+
+#########################################
+# Security Group RDS
+#########################################
+
+  RDSSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+
+    Properties:
+
+      GroupDescription: Security Group Banco
+
+      VpcId: !Ref AgendaVPC
+
+      SecurityGroupIngress:
+
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+
+      SecurityGroupEgress:
+
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+
+      Tags:
+        - Key: Name
+          Value: rds-sg
+
+#########################################
+# DB Subnet Group
+#########################################
+
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+
+    Properties:
+
+      DBSubnetGroupDescription: Agenda DB Subnet Group
+
+      DBSubnetGroupName: !Sub "${AWS::StackName}-db-subnet-group"
+
+      SubnetIds:
+
+        - !Ref PrivateSubnetA
+
+        - !Ref PrivateSubnetB
+
+      Tags:
+
+        - Key: Name
+
+          Value: agenda-db-subnet-group
+
+#########################################
+# Amazon RDS MySQL
+#########################################
+
+  AgendaDatabase:
+    Type: AWS::RDS::DBInstance
+
+    Properties:
+      DBInstanceIdentifier: !Sub "${AWS::StackName}-db"
+
+      Engine: mysql
+
+      DBInstanceClass: db.t3.micro
+
+      AllocatedStorage: 20
+
+      StorageType: gp3
+
+      MasterUsername: !Ref DBUsername
+
+      MasterUserPassword: !Ref DBPassword
+
+      DBName: agenda
+
+      PubliclyAccessible: false
+
+      MultiAZ: false
+
+      BackupRetentionPeriod: 0
+
+      VPCSecurityGroups:
+
+        - !Ref RDSSecurityGroup
+
+      DBSubnetGroupName: !Ref DBSubnetGroup
+
+      DeletionProtection: false
+
+      Tags:
+
+        - Key: Name
+
+          Value: agenda-db
+
+#########################################
+# Target Group
+#########################################
+
+  WebTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+
+    Properties:
+      Name: !Sub "${AWS::StackName}-tg"
+
+      Port: 80
+      Protocol: HTTP
+
+      VpcId: !Ref AgendaVPC
+
+      TargetType: instance
+
+      HealthCheckEnabled: true
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+
+      Matcher:
+        HttpCode: "200"
+
+      Tags:
+        - Key: Name
+          Value: agenda-target-group
+
+#########################################
+# Application Load Balancer
+#########################################
+
+  AgendaALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+
+    Properties:
+      Name: !Sub "${AWS::StackName}-alb"
+
+      Scheme: internet-facing
+
+      Type: application
+
+      SecurityGroups:
+
+        - !Ref ALBSecurityGroup
+
+      Subnets:
+
+        - !Ref PublicSubnetA
+
+        - !Ref PublicSubnetB
+
+      Tags:
+
+        - Key: Name
+
+          Value: agenda-alb
+
+#########################################
+# Listener HTTP
+#########################################
+
+  HTTPListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+
+    Properties:
+
+      LoadBalancerArn: !Ref AgendaALB
+
+      Port: 80
+
+      Protocol: HTTP
+
+      DefaultActions:
+
+        - Type: forward
+
+          TargetGroupArn: !Ref WebTargetGroup
+
+#########################################
+# EC2 WEB 01
+#########################################
+
+  AgendaWeb01:
+    Type: AWS::EC2::Instance
+
+    Properties:
+
+      ImageId: ami-06067086cf86c58e6
+
+      InstanceType: t3.micro
+
+      KeyName: !Ref KeyPairName
+
+      SubnetId: !Ref PublicSubnetA
+
+      SecurityGroupIds:
+
+        - !Ref WebSecurityGroup
+
+      Tags:
+
+        - Key: Name
+          Value: agenda-web-01
+
+      UserData:
+
+        Fn::Base64: !Sub |
+          #!/bin/bash
+
+          dnf update -y
+
+          dnf install -y httpd php php-mysqlnd git
+
+          systemctl enable httpd
+
+          systemctl start httpd
+
+          cat <<EOF > /var/www/html/index.php
+          <h1>Agenda Contatos</h1>
+          <h2>Servidor WEB01</h2>
+          EOF
+
+#########################################
+# EC2 WEB 02
+#########################################
+
+  AgendaWeb02:
+    Type: AWS::EC2::Instance
+
+    Properties:
+
+      ImageId: ami-06067086cf86c58e6
+
+      InstanceType: t3.micro
+
+      KeyName: !Ref KeyPairName
+
+      SubnetId: !Ref PublicSubnetB
+
+      SecurityGroupIds:
+
+        - !Ref WebSecurityGroup
+
+      Tags:
+
+        - Key: Name
+          Value: agenda-web-02
+
+      UserData:
+
+        Fn::Base64: !Sub |
+          #!/bin/bash
+
+          dnf update -y
+
+          dnf install -y httpd php php-mysqlnd git
+
+          systemctl enable httpd
+
+          systemctl start httpd
+
+          cat <<EOF > /var/www/html/index.php
+          <h1>Agenda Contatos</h1>
+          <h2>Servidor WEB02</h2>
+          EOF
+
+Outputs:
+
+  VPC:
+    Description: VPC criada
+    Value: !Ref AgendaVPC
+
+  PublicSubnetA:
+    Value: !Ref PublicSubnetA
+
+  PublicSubnetB:
+    Value: !Ref PublicSubnetB
+
+  PrivateSubnetA:
+    Value: !Ref PrivateSubnetA
+
+  PrivateSubnetB:
+    Value: !Ref PrivateSubnetB
+
+  LoadBalancerDNS:
+    Description: DNS público do ALB
+    Value: !GetAtt AgendaALB.DNSName
+
+  DatabaseEndpoint:
+    Description: Endpoint do banco MySQL
+    Value: !GetAtt AgendaDatabase.Endpoint.Address
+
+  DatabasePort:
+    Description: Porta do MySQL
+    Value: !GetAtt AgendaDatabase.Endpoint.Port
