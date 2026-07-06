@@ -6,7 +6,7 @@ body{
 .card{
     border:none;
     border-radius:16px;
-    box-shadow:0 10px 30px rgba(0,0,0,.08);
+    box-shadow:0 10px 30px rgba(94, 87, 87, 0.08);
 }
 
 .card-header{
@@ -19,7 +19,7 @@ body{
 }
 
 .form-control:focus{
-    border-color:#0d6efd;
+    border-color:#1b492a;
     box-shadow:0 0 0 .2rem rgba(13,110,253,.15);
 }
 

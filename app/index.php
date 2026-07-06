@@ -14,6 +14,20 @@ $resultado = $conn->query($sql);
 
     <title>Agenda de Contatos</title>
 
+    <div class="alert alert-info d-flex justify-content-between align-items-center">
+
+    <div>
+        <strong><i class="bi bi-hdd-network"></i> Servidor:</strong>
+        <?= gethostname(); ?>
+    </div>
+
+    <div>
+        <strong><i class="bi bi-server"></i> IP Privado:</strong>
+        <?= $_SERVER['SERVER_ADDR']; ?>
+    </div>
+
+</div>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet"
     href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
