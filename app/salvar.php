@@ -1,14 +1,36 @@
 <?php
 
-include "conexao.php";
+require_once "conexao.php";
 
-$nome=$_POST['nome'];
-$telefone=$_POST['telefone'];
-$email=$_POST['email'];
+if ($_SERVER["REQUEST_METHOD"] !== "POST") {
+    header("Location: index.php");
+    exit;
+}
 
-$sql="INSERT INTO contatos(nome,telefone,email)
-VALUES('$nome','$telefone','$email')";
+$nome = trim($_POST["nome"] ?? "");
+$telefone = trim($_POST["telefone"] ?? "");
+$email = trim($_POST["email"] ?? "");
 
-$conn->query($sql);
+if (empty($nome)) {
+    die("O nome é obrigatório.");
+}
 
-header("Location:index.php");
+$stmt = $conn->prepare("
+    INSERT INTO contatos (nome, telefone, email)
+    VALUES (?, ?, ?)
+");
+
+$stmt->bind_param(
+    "sss",
+    $nome,
+    $telefone,
+    $email
+);
+
+$stmt->execute();
+
+$stmt->close();
+$conn->close();
+
+header("Location: index.php");
+exit;
