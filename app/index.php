@@ -1,5 +1,39 @@
 <?php
 require_once "conexao.php";
+$modoEdicao = false;
+$contato = [
+    'id' => '',
+    'nome' => '',
+    'telefone' => '',
+    'email' => ''
+];
+
+if (isset($_GET['editar'])) {
+
+    $id = (int) $_GET['editar'];
+
+    $stmt = $conn->prepare("
+        SELECT *
+        FROM contatos
+        WHERE id = ?
+    ");
+
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+
+    $resultadoEdicao = $stmt->get_result();
+
+    if ($resultadoEdicao->num_rows > 0) {
+
+        $contato = $resultadoEdicao->fetch_assoc();
+
+        $modoEdicao = true;
+
+    }
+
+    $stmt->close();
+
+}
 
 $sql = "SELECT * FROM contatos ORDER BY id DESC";
 $resultado = $conn->query($sql);
@@ -14,16 +48,6 @@ $resultado = $conn->query($sql);
 
     <title>Agenda de Contatos</title>
 
-    <div class="alert alert-info d-flex justify-content-between align-items-center">
-
-    <div>
-        <strong><i class="bi bi-hdd-network"></i> Servidor:</strong>
-        <?= gethostname(); ?>
-    </div>
-
-    <div>
-        <strong><i class="bi bi-server"></i> IP Privado:</strong>
-        <?= $_SERVER['SERVER_ADDR']; ?>
     </div>
 
 </div>
@@ -38,6 +62,20 @@ $resultado = $conn->query($sql);
 <body>
 
 <div class="container py-5">
+
+    <div class="alert alert-info d-flex justify-content-between align-items-center mb-4">
+
+        <div>
+            <strong><i class="bi bi-hdd-network"></i> Servidor:</strong>
+            <?= gethostname(); ?>
+        </div>
+
+        <div>
+            <strong><i class="bi bi-server"></i> IP Privado:</strong>
+            <?= $_SERVER['SERVER_ADDR']; ?>
+    </div>
+
+</div>
 
     <div class="row justify-content-center">
 
@@ -76,7 +114,15 @@ $resultado = $conn->query($sql);
 
                 <div class="card-body">
 
-                    <form action="salvar.php" method="POST">
+                    <form action="<?= $modoEdicao ? 'atualizar.php' : 'salvar.php'; ?>" method="POST">
+                        <?php if($modoEdicao): ?>
+
+                        <input
+                            type="hidden"
+                            name="id"
+                            value="<?= $contato['id']; ?>">
+
+                        <?php endif; ?>
 
                         <div class="row">
 
@@ -90,7 +136,8 @@ $resultado = $conn->query($sql);
                                     type="text"
                                     name="nome"
                                     class="form-control"
-                                    required>
+                                    required
+                                    value="<?= htmlspecialchars($contato['nome']); ?>">
 
                             </div>
 
@@ -103,7 +150,8 @@ $resultado = $conn->query($sql);
                                 <input
                                     type="text"
                                     name="telefone"
-                                    class="form-control">
+                                    class="form-control"
+                                    value="<?= htmlspecialchars($contato['telefone']); ?>">
 
                             </div>
 
@@ -116,19 +164,34 @@ $resultado = $conn->query($sql);
                                 <input
                                     type="email"
                                     name="email"
-                                    class="form-control">
+                                    class="form-control"
+                                    value="<?= htmlspecialchars($contato['email']); ?>">
 
                             </div>
 
                         </div>
 
                         <button
-                            class="btn btn-success"
-                            type="submit">
+                        class="btn <?= $modoEdicao ? 'btn-warning' : 'btn-success'; ?>"
+                        type="submit">
 
-                            <i class="bi bi-plus-circle"></i> Adicionar Contato
+                        <i class="bi <?= $modoEdicao ? 'bi-pencil-square' : 'bi-plus-circle'; ?>"></i>
+
+                        <?= $modoEdicao ? 'Salvar Alterações' : 'Adicionar Contato'; ?>
 
                         </button>
+
+                        <?php if($modoEdicao): ?>
+
+                        <a
+                        href="index.php"
+                        class="btn btn-secondary">
+
+                        Cancelar
+
+                        </a>
+
+                        <?php endif; ?>
 
                     </form>
 
@@ -177,22 +240,22 @@ $resultado = $conn->query($sql);
 
                             <?php if ($resultado->num_rows > 0): ?>
 
-                                <?php while ($contato = $resultado->fetch_assoc()): ?>
+                                <?php while ($linha = $resultado->fetch_assoc()): ?>
 
                                     <tr>
 
-                                        <td><?= htmlspecialchars($contato['nome']); ?></td>
+                                        <td><?= htmlspecialchars($linha['nome']); ?></td>
 
-                                        <td><?= htmlspecialchars($contato['telefone']); ?></td>
+                                        <td><?= htmlspecialchars($linha['telefone']); ?></td>
 
-                                        <td><?= htmlspecialchars($contato['email']); ?></td>
+                                        <td><?= htmlspecialchars($linha['email']); ?></td>
 
                                         <td>
 
                                             <div class="d-flex gap-2">
 
                                             <a
-                                            href="editar.php?id=<?= $contato['id']; ?>"
+                                            href="index.php?editar=<?= $linha['id']; ?>"
                                             class="btn btn-warning btn-sm"
                                             title="Editar">
 
@@ -201,7 +264,7 @@ $resultado = $conn->query($sql);
                                             </a>
 
                                             <a
-                                            href="excluir.php?id=<?= $contato['id']; ?>"
+                                            href="excluir.php?id=<?= $linha['id']; ?>"
                                             class="btn btn-danger btn-sm"
                                             onclick="return confirm('Deseja excluir este contato?');"
                                             title="Excluir">
