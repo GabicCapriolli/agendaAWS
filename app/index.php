@@ -189,14 +189,28 @@ $resultado = $conn->query($sql);
 
                                         <td>
 
-                                            <a
-                                                href="excluir.php?id=<?= $contato['id']; ?>"
-                                                class="btn btn-danger btn-sm"
-                                                onclick="return confirm('Deseja excluir este contato?');">
+                                            <div class="d-flex gap-2">
 
-                                                <i class="bi bi-trash3-fill"></i>
+                                            <a
+                                            href="editar.php?id=<?= $contato['id']; ?>"
+                                            class="btn btn-warning btn-sm"
+                                            title="Editar">
+
+                                            <i class="bi bi-pencil-fill"></i>
 
                                             </a>
+
+                                            <a
+                                            href="excluir.php?id=<?= $contato['id']; ?>"
+                                            class="btn btn-danger btn-sm"
+                                            onclick="return confirm('Deseja excluir este contato?');"
+                                            title="Excluir">
+
+                                            <i class="bi bi-trash3-fill"></i>
+
+                                            </a>
+
+                                            </div>
 
                                         </td>
 
